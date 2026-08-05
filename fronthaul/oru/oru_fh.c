@@ -15,6 +15,7 @@
 #include <rte_eal.h>
 #include <rte_ethdev.h>
 #include "oru_packet_processor.h"
+#include "oru_ul_pcap.h"
 #include "log.h"
 #include <sched.h>
 
@@ -191,6 +192,8 @@ void *oru_fh_init(oru_fh_config_t *cfg)
     free(fh);
     return NULL;
   }
+
+  oru_ul_pcap_init_from_env(cfg->prach_eaxc_offset);
 
   fh->packet_processor = init_packet_processor(cfg->numerology,
                                                cfg->num_prbs,
