@@ -44,6 +44,11 @@ struct taps_client_t {
   channel_desc_t channel_descs_[MAX_NUM_IDS];
   struct complexf *ch_ps_storage_[MAX_NUM_IDS][MAX_TX_RX_ANTENNAS * MAX_TX_RX_ANTENNAS];
 
+  // Last geometry announced per ID, so a steady tap stream is not logged on every update
+  uint32_t logged_taps_len_[MAX_NUM_IDS];
+  uint32_t logged_num_rx_[MAX_NUM_IDS];
+  uint32_t logged_num_tx_[MAX_NUM_IDS];
+
   std::mutex mutex_;
   std::thread thread_;
 
@@ -55,6 +60,9 @@ struct taps_client_t {
   {
     memset(current_buffers_, 0, sizeof(current_buffers_));
     memset(channel_descs_, 0, sizeof(channel_descs_));
+    memset(logged_taps_len_, 0, sizeof(logged_taps_len_));
+    memset(logged_num_rx_, 0, sizeof(logged_num_rx_));
+    memset(logged_num_tx_, 0, sizeof(logged_num_tx_));
 
     for (int i = 0; i < MAX_NUM_IDS; i++)
       channel_descs_[i].ch_ps = ch_ps_storage_[i];
@@ -187,7 +195,20 @@ struct taps_client_t {
       current_buffers_[id] = buf;
     }
 
-    LOG_A(HW, "New taps for id %d: channel_length %u, %ux%u antennas\n", id, taps_len, num_rx, num_tx);
+    /* Called from the vrtsim sample path, so this runs once per slot that has taps pending —
+     * 10/s for a 100 ms publisher. An always-printed line here is a blocking write to the
+     * container's stdout pipe, which is enough to overrun the slot deadline and show up as
+     * dropped PDSCH PDUs, stale UL configs and PBCH failures. Announce the geometry only when
+     * it actually changes (that is what catches a publisher/RU antenna mismatch); the steady
+     * stream stays at LOG_D. */
+    if (taps_len != logged_taps_len_[id] || num_rx != logged_num_rx_[id] || num_tx != logged_num_tx_[id]) {
+      logged_taps_len_[id] = taps_len;
+      logged_num_rx_[id] = num_rx;
+      logged_num_tx_[id] = num_tx;
+      LOG_A(HW, "New taps for id %d: channel_length %u, %ux%u antennas\n", id, taps_len, num_rx, num_tx);
+    } else {
+      LOG_D(HW, "New taps for id %d: channel_length %u, %ux%u antennas\n", id, taps_len, num_rx, num_tx);
+    }
 
     return desc;
   }
