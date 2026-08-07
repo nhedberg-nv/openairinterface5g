@@ -381,7 +381,8 @@ static client_info_t client_read_info(char *socket_path)
   addr.sun_family = AF_UNIX;
   strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 
-  while (tries < 10) {
+  /* O-RU publishes after DPDK/xRAN init; allow up to ~2 min in container stacks */
+  while (tries < 120) {
     int sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock_fd >= 0) {
       if (connect(sock_fd, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
